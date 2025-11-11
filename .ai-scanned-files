@@ -1,0 +1,5 @@
++./config.sample.php
++./src/*
++./public/*
++./templates/*
+

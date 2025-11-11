@@ -1,5 +1,7 @@
 <?php
 
+$llmApiKey = '';
+
 $db1Config = [
   'label' => 'Preprod',
   'host' => '',
