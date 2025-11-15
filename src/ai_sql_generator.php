@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-const SQL_GENERATOR_MODEL = 'claude-sonnet-4-5';
+const SQL_GENERATOR_MODEL = 'claude-haiku-4-5';
 
 function generateSqlStatementsForTable(
   string $apiKey,

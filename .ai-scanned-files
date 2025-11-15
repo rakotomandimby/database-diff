@@ -2,4 +2,4 @@
 +./src/*
 +./public/*
 +./templates/*
-
++./database-structure.sql
