@@ -16,3 +16,9 @@ $db2Config = [
   'password' => '',
   'database' => '',
 ];
+$storageDatabase = [
+  'host' => '',
+  'username' => '',
+  'password' => '',
+  'database' => ''
+];

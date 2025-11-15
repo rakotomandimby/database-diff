@@ -12,17 +12,29 @@ $comparison = null;
 $error = null;
 $db1Connection = null;
 $db2Connection = null;
+$storageConnection = null;
+$runId = null;
 
 try {
     $db1Connection = createConnection($db1Config);
     $db2Connection = createConnection($db2Config);
+    $storageConnection = createConnection($storageDatabase);
 
-    $comparison = buildTableComparison($db1Config, $db1Connection, $db2Config, $db2Connection);
+    resetStorageDatabase($storageConnection);
+    $runId = createComparisonRun($storageConnection, $db1Config, $db2Config);
 
-    // Generate full context for AI
-    $fullContext = buildFullDatabaseContext($comparison);
+    $comparison = buildTableComparison(
+        $db1Config,
+        $db1Connection,
+        $db2Config,
+        $db2Connection,
+        $storageConnection,
+        $runId
+    );
 
-    // Generate SQL statements for each table with differences
+    $fullContext = buildFullDatabaseContext($comparison, $storageConnection, $runId);
+    $modelName = defined('SQL_GENERATOR_MODEL') ? SQL_GENERATOR_MODEL : 'claude-sonnet-4-5';
+
     foreach ($comparison['tableDetails'] as $tableName => &$tableDetail) {
         if ($tableDetail['hasDifferences']) {
             $sqlStatements = generateSqlStatementsForTable(
@@ -34,13 +46,21 @@ try {
                 $fullContext
             );
             $tableDetail['sqlStatements'] = $sqlStatements;
+            storeGeneratedSql($storageConnection, $runId, $tableName, $modelName, $sqlStatements);
         } else {
             $tableDetail['sqlStatements'] = '-- No changes needed';
         }
     }
     unset($tableDetail);
+
+    markComparisonRunCompleted($storageConnection, $runId);
 } catch (Throwable $exception) {
     $error = $exception;
+
+    if ($storageConnection instanceof mysqli && $runId !== null) {
+        markComparisonRunFailed($storageConnection, $runId, $exception->getMessage());
+    }
+
     http_response_code(500);
 }
 
@@ -53,3 +73,8 @@ if ($db1Connection instanceof mysqli) {
 if ($db2Connection instanceof mysqli) {
     $db2Connection->close();
 }
+
+if ($storageConnection instanceof mysqli) {
+    $storageConnection->close();
+}
+

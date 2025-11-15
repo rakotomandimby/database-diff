@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+const SQL_GENERATOR_MODEL = 'claude-sonnet-4-5';
+
 function generateSqlStatementsForTable(
   string $apiKey,
   string $tableName,
@@ -15,8 +17,8 @@ function generateSqlStatementsForTable(
   $prompt = buildPromptForTable($tableName, $tableDetail, $db1Label, $db2Label, $fullContext);
 
   $payload = [
-    'model' => 'claude-haiku-4-5',
-    'max_tokens' => 8192,
+    'model' => SQL_GENERATOR_MODEL,
+    'max_tokens' => 2048,
     'system' => 'You are a helpful assistant that generates SQL statements for MySQL database schema migration based on provided context and instructions.',
     'messages' => [
       [
@@ -29,16 +31,24 @@ function generateSqlStatementsForTable(
   $ch = curl_init($url);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
   curl_setopt($ch, CURLOPT_POST, true);
-  curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+  curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
   curl_setopt($ch, CURLOPT_HTTPHEADER, [
     'Content-Type: application/json',
     'x-api-key: ' . $apiKey,
     'anthropic-version: 2023-06-01',
+    'anthropic-beta: context-1m-2025-08-07',
   ]);
+  curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 
   $response = curl_exec($ch);
-  $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  $curlError = $response === false ? curl_error($ch) : null;
   curl_close($ch);
+
+  if ($response === false) {
+    return '-- Error: Unable to generate SQL (cURL error: ' . ($curlError ?: 'unknown') . ')';
+  }
 
   if ($httpCode !== 200) {
     return "-- Error: Unable to generate SQL (HTTP $httpCode)\n-- Response: " . substr($response, 0, 200);
@@ -46,11 +56,15 @@ function generateSqlStatementsForTable(
 
   $data = json_decode($response, true);
 
+  if (!is_array($data)) {
+    return '-- Error: Unable to parse API response';
+  }
+
   if (isset($data['content'][0]['text'])) {
     return extractSqlFromResponse($data['content'][0]['text']);
   }
 
-  return "-- Error: Unexpected API response format";
+  return '-- Error: Unexpected API response format';
 }
 
 function buildPromptForTable(
@@ -161,7 +175,6 @@ function formatTableStructure(array $tableDetail, string $dbKey): string
 
 function extractSqlFromResponse(string $response): string
 {
-  // Remove markdown code blocks if present
   $response = preg_replace('/```sql\s*/i', '', $response);
   $response = preg_replace('/```\s*$/', '', $response);
   $response = trim($response);
@@ -169,7 +182,7 @@ function extractSqlFromResponse(string $response): string
   return $response;
 }
 
-function buildFullDatabaseContext(array $comparison): string
+function buildFullDatabaseContext(array $comparison, mysqli $storageConnection, int $runId): string
 {
   $context = "# Database Comparison Overview\n\n";
   $context .= "**" . $comparison['db1Label'] . " Tables:** " . count($comparison['tablesDb1']) . "\n";
@@ -179,17 +192,32 @@ function buildFullDatabaseContext(array $comparison): string
 
   $context .= "# All Tables Structure\n\n";
 
-  foreach ($comparison['tableDetails'] as $tableName => $tableDetail) {
+  $allTables = getAllTablesForRun($storageConnection, $runId);
+
+  foreach ($allTables as $tableName) {
     $context .= "## Table: `$tableName`\n\n";
+
+    $tableDetail = $comparison['tableDetails'][$tableName] ?? buildTableDetailFromStorage(
+      $storageConnection,
+      $runId,
+      $tableName,
+      false
+    );
 
     if ($tableDetail['inDb1']) {
       $context .= "### In " . $comparison['db1Label'] . ":\n";
       $context .= formatTableStructureForContext($tableDetail, 'db1');
+    } else {
+      $context .= "### In " . $comparison['db1Label'] . ":\n";
+      $context .= "*Table not present*\n";
     }
 
     if ($tableDetail['inDb2']) {
       $context .= "\n### In " . $comparison['db2Label'] . ":\n";
       $context .= formatTableStructureForContext($tableDetail, 'db2');
+    } else {
+      $context .= "\n### In " . $comparison['db2Label'] . ":\n";
+      $context .= "*Table not present*\n";
     }
 
     $context .= "\n---\n\n";
