@@ -122,8 +122,17 @@ function getTables(mysqli $connection): array
 
 function fetchTableStatus(mysqli $connection, string $tableName): array
 {
-    $escapedName = $connection->real_escape_string(addcslashes($tableName, '_%'));
-    $query = sprintf("SHOW TABLE STATUS LIKE '%s' ESCAPE '\\\\'", $escapedName);
+    $pattern = strtr(
+        $tableName,
+        [
+            '\\' => '\\\\',
+            '_' => '\\_',
+            '%' => '\\%',
+        ]
+    );
+    $escapedPattern = $connection->real_escape_string($pattern);
+    $query = sprintf("SHOW TABLE STATUS LIKE '%s'", $escapedPattern);
+
     $result = $connection->query($query);
 
     $row = $result->fetch_assoc() ?: [];
@@ -920,4 +929,5 @@ function createConnection(array $config): mysqli
 
     return $connection;
 }
+
 
