@@ -38,18 +38,15 @@ function buildTableComparison(
     $allTables = array_values(array_unique(array_merge($tablesDb1, $tablesDb2)));
     sort($allTables, SORT_NATURAL | SORT_FLAG_CASE);
 
-    // Don't store all table details in memory - only minimal summary data
-    $tableDetailsCount = 0;
+    $tableDetails = [];
+
     foreach ($allTables as $tableName) {
         $tableDetail = buildTableDetailFromStorage($storageConnection, $runId, $tableName);
-        
+
         if ($tableDetail['hasDifferences']) {
-            $tableDetailsCount++;
+            $tableDetails[$tableName] = $tableDetail;
             persistTableDifferences($storageConnection, $runId, $tableName, $tableDetail);
         }
-        
-        // Discard after persisting to free memory
-        unset($tableDetail);
     }
 
     return [
@@ -59,8 +56,7 @@ function buildTableComparison(
         'tablesDb2' => $tablesDb2,
         'onlyInDb1' => $onlyInDb1,
         'onlyInDb2' => $onlyInDb2,
-        'tableDetails' => [], // Return empty - will be fetched on-demand during rendering
-        'tableDetailsCount' => $tableDetailsCount,
+        'tableDetails' => $tableDetails,
         'runId' => $runId,
     ];
 }
@@ -129,28 +125,5 @@ function storeGeneratedSql(
     $stmt->bind_param('isss', $runId, $tableName, $statements, $modelName);
     $stmt->execute();
     $stmt->close();
-}
-
-function getTableDifferencesForRun(mysqli $storageConnection, int $runId): array
-{
-    $stmt = $storageConnection->prepare(
-        'SELECT DISTINCT table_name
-         FROM table_differences
-         WHERE run_id = ?
-         ORDER BY table_name'
-    );
-
-    $stmt->bind_param('i', $runId);
-    $stmt->execute();
-    $stmt->bind_result($tableName);
-
-    $tables = [];
-    while ($stmt->fetch()) {
-        $tables[] = $tableName;
-    }
-
-    $stmt->close();
-
-    return $tables;
 }
 
