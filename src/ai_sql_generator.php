@@ -182,13 +182,31 @@ function extractSqlFromResponse(string $response): string
   return $response;
 }
 
-function buildFullDatabaseContext(array $comparison, mysqli $storageConnection, int $runId): string
+function buildFullDatabaseContext(mysqli $storageConnection, int $runId): string
 {
   $context = "# Database Comparison Overview\n\n";
-  $context .= "**" . $comparison['db1Label'] . " Tables:** " . count($comparison['tablesDb1']) . "\n";
-  $context .= "**" . $comparison['db2Label'] . " Tables:** " . count($comparison['tablesDb2']) . "\n";
-  $context .= "**Tables only in " . $comparison['db1Label'] . ":** " . implode(', ', $comparison['onlyInDb1']) . "\n";
-  $context .= "**Tables only in " . $comparison['db2Label'] . ":** " . implode(', ', $comparison['onlyInDb2']) . "\n\n";
+  
+  // Get summary counts from storage
+  $tablesDb1 = getTablesFromStorage($storageConnection, $runId, 'source');
+  $tablesDb2 = getTablesFromStorage($storageConnection, $runId, 'target');
+  
+  $onlyInDb1 = array_values(array_diff($tablesDb1, $tablesDb2));
+  $onlyInDb2 = array_values(array_diff($tablesDb2, $tablesDb1));
+  
+  // Fetch labels from database
+  $stmt = $storageConnection->prepare(
+    'SELECT source_label, target_label FROM comparison_runs WHERE id = ? LIMIT 1'
+  );
+  $stmt->bind_param('i', $runId);
+  $stmt->execute();
+  $stmt->bind_result($db1Label, $db2Label);
+  $stmt->fetch();
+  $stmt->close();
+  
+  $context .= "**$db1Label Tables:** " . count($tablesDb1) . "\n";
+  $context .= "**$db2Label Tables:** " . count($tablesDb2) . "\n";
+  $context .= "**Tables only in $db1Label:** " . implode(', ', $onlyInDb1) . "\n";
+  $context .= "**Tables only in $db2Label:** " . implode(', ', $onlyInDb2) . "\n\n";
 
   $context .= "# All Tables Structure\n\n";
 
@@ -197,7 +215,7 @@ function buildFullDatabaseContext(array $comparison, mysqli $storageConnection, 
   foreach ($allTables as $tableName) {
     $context .= "## Table: `$tableName`\n\n";
 
-    $tableDetail = $comparison['tableDetails'][$tableName] ?? buildTableDetailFromStorage(
+    $tableDetail = buildTableDetailFromStorage(
       $storageConnection,
       $runId,
       $tableName,
@@ -205,22 +223,25 @@ function buildFullDatabaseContext(array $comparison, mysqli $storageConnection, 
     );
 
     if ($tableDetail['inDb1']) {
-      $context .= "### In " . $comparison['db1Label'] . ":\n";
+      $context .= "### In $db1Label:\n";
       $context .= formatTableStructureForContext($tableDetail, 'db1');
     } else {
-      $context .= "### In " . $comparison['db1Label'] . ":\n";
+      $context .= "### In $db1Label:\n";
       $context .= "*Table not present*\n";
     }
 
     if ($tableDetail['inDb2']) {
-      $context .= "\n### In " . $comparison['db2Label'] . ":\n";
+      $context .= "\n### In $db2Label:\n";
       $context .= formatTableStructureForContext($tableDetail, 'db2');
     } else {
-      $context .= "\n### In " . $comparison['db2Label'] . ":\n";
+      $context .= "\n### In $db2Label:\n";
       $context .= "*Table not present*\n";
     }
 
     $context .= "\n---\n\n";
+    
+    // Free memory after each table
+    unset($tableDetail);
   }
 
   return $context;

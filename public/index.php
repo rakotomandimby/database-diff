@@ -32,10 +32,16 @@ try {
         $runId
     );
 
-    $fullContext = buildFullDatabaseContext($comparison, $storageConnection, $runId);
+    $fullContext = buildFullDatabaseContext($storageConnection, $runId);
     $modelName = defined('SQL_GENERATOR_MODEL') ? SQL_GENERATOR_MODEL : 'claude-sonnet-4-5';
 
-    foreach ($comparison['tableDetails'] as $tableName => &$tableDetail) {
+    // Process only tables with differences
+    $tablesToProcess = getTableDifferencesForRun($storageConnection, $runId);
+    
+    foreach ($tablesToProcess as $tableName) {
+        // Fetch table detail on-demand (will be discarded after processing)
+        $tableDetail = buildTableDetailFromStorage($storageConnection, $runId, $tableName);
+        
         if ($tableDetail['hasDifferences']) {
             $sqlStatements = generateSqlStatementsForTable(
                 $llmApiKey,
@@ -45,13 +51,12 @@ try {
                 $comparison['db2Label'],
                 $fullContext
             );
-            $tableDetail['sqlStatements'] = $sqlStatements;
             storeGeneratedSql($storageConnection, $runId, $tableName, $modelName, $sqlStatements);
-        } else {
-            $tableDetail['sqlStatements'] = '-- No changes needed';
         }
+        
+        // Discard table detail immediately after processing to free memory
+        unset($tableDetail);
     }
-    unset($tableDetail);
 
     markComparisonRunCompleted($storageConnection, $runId);
 } catch (Throwable $exception) {

@@ -172,3 +172,22 @@ function resetStorageDatabase(mysqli $storageConnection): void
     }
 }
 
+function getGeneratedSqlForTable(mysqli $storageConnection, int $runId, string $tableName): ?string
+{
+    $stmt = $storageConnection->prepare(
+        'SELECT statements FROM generated_sql WHERE run_id = ? AND table_name = ? LIMIT 1'
+    );
+
+    $stmt->bind_param('is', $runId, $tableName);
+    $stmt->execute();
+    $stmt->bind_result($statements);
+
+    $result = null;
+    if ($stmt->fetch()) {
+        $result = $statements;
+    }
+
+    $stmt->close();
+
+    return $result;
+}
