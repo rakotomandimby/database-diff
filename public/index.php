@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../src/connection.php';
 require_once __DIR__ . '/../src/database_comparison.php';
 require_once __DIR__ . '/../src/progress_tracker.php';
 
@@ -97,4 +98,3 @@ require __DIR__ . '/../templates/database_comparison.php';
 if ($storageConnection instanceof mysqli) {
     $storageConnection->close();
 }
-
