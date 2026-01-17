@@ -20,7 +20,6 @@ try {
     $db2Connection = createConnection($db2Config);
     $storageConnection = createConnection($storageDatabase);
 
-    resetStorageDatabase($storageConnection);
     $runId = createComparisonRun($storageConnection, $db1Config, $db2Config);
 
     $comparison = buildTableComparison(

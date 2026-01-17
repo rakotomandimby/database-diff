@@ -148,27 +148,94 @@ function getAllTablesForRun(mysqli $storageConnection, int $runId): array
     return $tables;
 }
 
-function resetStorageDatabase(mysqli $storageConnection): void
+/**
+ * Deletes comparison runs older than the specified number of days.
+ * This function should be called periodically (e.g., via cron job) to clean up old data.
+ * 
+ * @param mysqli $storageConnection The storage database connection
+ * @param int $daysToKeep Number of days to keep (default: 7)
+ * @return int Number of runs deleted
+ */
+function cleanupOldComparisonRuns(mysqli $storageConnection, int $daysToKeep = 7): int
 {
-    $storageConnection->query('SET FOREIGN_KEY_CHECKS = 0');
+    $stmt = $storageConnection->prepare(
+        'DELETE FROM comparison_runs
+         WHERE completed_at < DATE_SUB(NOW(), INTERVAL ? DAY)
+            OR (status = "failed" AND started_at < DATE_SUB(NOW(), INTERVAL ? DAY))'
+    );
 
-    try {
-        $tables = [
-            'generated_sql',
-            'table_differences',
-            'foreign_key_columns',
-            'foreign_key_snapshots',
-            'column_snapshots',
-            'table_snapshots',
-            'comparison_runs',
-        ];
+    $stmt->bind_param('ii', $daysToKeep, $daysToKeep);
+    $stmt->execute();
+    $affectedRows = $stmt->affected_rows;
+    $stmt->close();
 
-        foreach ($tables as $table) {
-            $quoted = sprintf('`%s`', str_replace('`', '``', $table));
-            $storageConnection->query('TRUNCATE TABLE ' . $quoted);
-        }
-    } finally {
-        $storageConnection->query('SET FOREIGN_KEY_CHECKS = 1');
-    }
+    return $affectedRows;
 }
 
+/**
+ * Deletes comparison runs that have been running for more than the specified timeout.
+ * This helps clean up stale runs that may have crashed without proper cleanup.
+ * 
+ * @param mysqli $storageConnection The storage database connection
+ * @param int $timeoutMinutes Timeout in minutes (default: 30)
+ * @return int Number of runs deleted
+ */
+function cleanupStalledComparisonRuns(mysqli $storageConnection, int $timeoutMinutes = 30): int
+{
+    $stmt = $storageConnection->prepare(
+        'DELETE FROM comparison_runs
+         WHERE status = "running"
+           AND started_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)'
+    );
+
+    $stmt->bind_param('i', $timeoutMinutes);
+    $stmt->execute();
+    $affectedRows = $stmt->affected_rows;
+    $stmt->close();
+
+    return $affectedRows;
+}
+
+/**
+ * Gets statistics about the storage database usage.
+ * Useful for monitoring and deciding when to run cleanup operations.
+ * 
+ * @param mysqli $storageConnection The storage database connection
+ * @return array Statistics including total runs, completed runs, failed runs, etc.
+ */
+function getStorageStatistics(mysqli $storageConnection): array
+{
+    $stats = [
+        'totalRuns' => 0,
+        'completedRuns' => 0,
+        'failedRuns' => 0,
+        'runningRuns' => 0,
+        'oldestRun' => null,
+        'newestRun' => null,
+    ];
+
+    $result = $storageConnection->query(
+        'SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN status = "completed" THEN 1 ELSE 0 END) as completed,
+            SUM(CASE WHEN status = "failed" THEN 1 ELSE 0 END) as failed,
+            SUM(CASE WHEN status = "running" THEN 1 ELSE 0 END) as running,
+            MIN(started_at) as oldest,
+            MAX(started_at) as newest
+         FROM comparison_runs'
+    );
+
+    if ($result !== false) {
+        $row = $result->fetch_assoc();
+        if ($row !== null) {
+            $stats['totalRuns'] = (int) $row['total'];
+            $stats['completedRuns'] = (int) $row['completed'];
+            $stats['failedRuns'] = (int) $row['failed'];
+            $stats['runningRuns'] = (int) $row['running'];
+            $stats['oldestRun'] = $row['oldest'];
+            $stats['newestRun'] = $row['newest'];
+        }
+        $result->free();
+    }
+    return $stats;
+}
