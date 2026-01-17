@@ -10,8 +10,24 @@ function generateSqlStatementsForTable(
   array $tableDetail,
   string $db1Label,
   string $db2Label,
-  string $fullContext
+  string $fullContext,
+  mysqli $storageConnection,
+  int $runId,
+  int $currentTableIndex,
+  int $totalTables
 ): string {
+  $baseProgress = 65;
+  $progressRange = 30; // SQL generation covers 65-95%
+  
+  $progressPercent = $baseProgress + (int) round(($currentTableIndex / $totalTables) * $progressRange);
+  reportProgress(
+    $storageConnection,
+    $runId,
+    'generate_sql',
+    "Generating SQL for table {$tableName} ({$currentTableIndex}/{$totalTables})...",
+    $progressPercent
+  );
+
   $url = 'https://api.anthropic.com/v1/messages';
 
   $prompt = buildPromptForTable($tableName, $tableDetail, $db1Label, $db2Label, $fullContext);
@@ -27,6 +43,14 @@ function generateSqlStatementsForTable(
       ],
     ],
   ];
+
+  reportProgress(
+    $storageConnection,
+    $runId,
+    'ai_request',
+    "Waiting for AI response for table {$tableName}...",
+    $progressPercent
+  );
 
   $ch = curl_init($url);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -61,6 +85,13 @@ function generateSqlStatementsForTable(
   }
 
   if (isset($data['content'][0]['text'])) {
+    reportProgress(
+      $storageConnection,
+      $runId,
+      'sql_generated',
+      "SQL generated for table {$tableName}",
+      $progressPercent
+    );
     return extractSqlFromResponse($data['content'][0]['text']);
   }
 
@@ -184,6 +215,14 @@ function extractSqlFromResponse(string $response): string
 
 function buildFullDatabaseContext(array $comparison, mysqli $storageConnection, int $runId): string
 {
+  reportProgress(
+    $storageConnection,
+    $runId,
+    'build_context',
+    'Building context for AI model...',
+    65
+  );
+
   $context = "# Database Comparison Overview\n\n";
   $context .= "**" . $comparison['db1Label'] . " Tables:** " . count($comparison['tablesDb1']) . "\n";
   $context .= "**" . $comparison['db2Label'] . " Tables:** " . count($comparison['tablesDb2']) . "\n";

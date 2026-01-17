@@ -13,6 +13,9 @@ function buildTableComparison(
     $db1Label = $db1Config['label'] ?? 'Database 1';
     $db2Label = $db2Config['label'] ?? 'Database 2';
 
+    reportProgress($storageConnection, $runId, 'init', 'Initializing comparison...', 0);
+
+    reportProgress($storageConnection, $runId, 'snapshot_source', "Loading {$db1Label} schema...", 5);
     captureDatabaseSnapshot(
         $db1Connection,
         $storageConnection,
@@ -21,6 +24,7 @@ function buildTableComparison(
         $db1Config['database'] ?? ''
     );
 
+    reportProgress($storageConnection, $runId, 'snapshot_target', "Loading {$db2Label} schema...", 30);
     captureDatabaseSnapshot(
         $db2Connection,
         $storageConnection,
@@ -29,6 +33,7 @@ function buildTableComparison(
         $db2Config['database'] ?? ''
     );
 
+    reportProgress($storageConnection, $runId, 'load_tables', 'Loading table lists...', 50);
     $tablesDb1 = getTablesFromStorage($storageConnection, $runId, 'source');
     $tablesDb2 = getTablesFromStorage($storageConnection, $runId, 'target');
 
@@ -38,9 +43,22 @@ function buildTableComparison(
     $allTables = array_values(array_unique(array_merge($tablesDb1, $tablesDb2)));
     sort($allTables, SORT_NATURAL | SORT_FLAG_CASE);
 
+    reportProgress($storageConnection, $runId, 'compare_schemas', 'Comparing schemas...', 55);
     $tableDetails = [];
+    $totalTables = count($allTables);
+    $processedTables = 0;
 
     foreach ($allTables as $tableName) {
+        $processedTables++;
+        $progressPercent = 55 + (int) round(($processedTables / $totalTables) * 10);
+        reportProgress(
+            $storageConnection,
+            $runId,
+            'analyze_table',
+            "Analyzing table {$tableName} ({$processedTables}/{$totalTables})...",
+            $progressPercent
+        );
+
         $tableDetail = buildTableDetailFromStorage($storageConnection, $runId, $tableName);
 
         if ($tableDetail['hasDifferences']) {
@@ -48,6 +66,8 @@ function buildTableComparison(
             persistTableDifferences($storageConnection, $runId, $tableName, $tableDetail);
         }
     }
+
+    reportProgress($storageConnection, $runId, 'comparison_complete', 'Schema comparison complete', 65);
 
     return [
         'db1Label' => $db1Label,
@@ -84,7 +104,7 @@ function markComparisonRunCompleted(mysqli $storageConnection, int $runId): void
 {
     $stmt = $storageConnection->prepare(
         'UPDATE comparison_runs
-         SET status = "completed", completed_at = NOW()
+         SET status = "completed", completed_at = NOW(), progress_percent = 100
          WHERE id = ?'
     );
 

@@ -15,7 +15,26 @@ function captureDatabaseSnapshot(
         return;
     }
 
+    $totalTables = count($tables);
+    $processedTables = 0;
+
+    // Determine base progress percentage based on database side
+    $baseProgress = $databaseSide === 'source' ? 5 : 30;
+    $progressRange = 25; // Each snapshot phase covers 25% of total progress
+
     foreach ($tables as $tableName) {
+        $processedTables++;
+        $progressPercent = $baseProgress + (int) round(($processedTables / $totalTables) * $progressRange);
+        
+        $sideLabel = $databaseSide === 'source' ? 'source' : 'target';
+        reportProgress(
+            $storageConnection,
+            $runId,
+            "snapshot_{$sideLabel}_table",
+            "Loading {$sideLabel} table {$tableName} ({$processedTables}/{$totalTables})...",
+            $progressPercent
+        );
+
         $tableStatus = fetchTableStatus($dbConnection, $tableName);
         $metadataJson = null;
 
@@ -43,6 +62,17 @@ function captureDatabaseSnapshot(
         storeColumnSnapshots($dbConnection, $storageConnection, $tableSnapshotId, $tableName);
         storeForeignKeySnapshots($dbConnection, $storageConnection, $tableSnapshotId, $databaseName, $tableName);
     }
+
+    // Report completion of this snapshot phase
+    $finalProgress = $baseProgress + $progressRange;
+    $sideLabel = $databaseSide === 'source' ? 'source' : 'target';
+    reportProgress(
+        $storageConnection,
+        $runId,
+        "snapshot_{$sideLabel}_complete",
+        ucfirst($sideLabel) . " database snapshot complete",
+        $finalProgress
+    );
 }
 
 function getTables(mysqli $connection): array
