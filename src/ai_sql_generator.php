@@ -125,6 +125,9 @@ function callGoogleGeminiApi(string $apiKey, string $model, string $system, stri
 
   return executeCurlRequest($url, $headers, $payload, function (array $data, string $rawResponse) {
     // Google Gemini Interactions response format: { "outputs": [ { "text": "..." } ] }
+    if (isset($data['outputs'][1]['text'])) {
+      return ['success' => true, 'text' => $data['outputs'][1]['text']];
+    }
     if (isset($data['outputs'][0]['text'])) {
       return ['success' => true, 'text' => $data['outputs'][0]['text']];
     }
