@@ -110,7 +110,17 @@ try {
         
         // Generate SQL statements with AI
         $fullContext = buildFullDatabaseContext($comparison, $storageConnection, $runId);
-        $modelName = defined('SQL_GENERATOR_MODEL') ? SQL_GENERATOR_MODEL : 'claude-haiku-4-5';
+        
+        // Determine settings from config
+        $provider = isset($llmProvider) ? $llmProvider : 'anthropic';
+        $model = isset($llmModel) && $llmModel !== '' ? $llmModel : '';
+        
+        // Determine model name for logging
+        if ($model === '') {
+            $modelName = $provider === 'google' ? DEFAULT_GOOGLE_MODEL : DEFAULT_ANTHROPIC_MODEL;
+        } else {
+            $modelName = $model;
+        }
         
         $tablesWithDifferences = array_filter(
             $comparison['tableDetails'],
@@ -127,6 +137,8 @@ try {
                 $currentTableIndex++;
                 
                 $sqlStatements = generateSqlStatementsForTable(
+                    $provider,
+                    $model,
                     $llmApiKey,
                     $tableName,
                     $tableDetail,

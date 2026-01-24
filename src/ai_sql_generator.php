@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
-const SQL_GENERATOR_MODEL = 'claude-haiku-4-5';
+const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5';
+const DEFAULT_GOOGLE_MODEL = 'gemini-3-flash-preview';
 
 function generateSqlStatementsForTable(
+  string $provider,
+  string $model,
   string $apiKey,
   string $tableName,
   array $tableDetail,
@@ -28,21 +31,8 @@ function generateSqlStatementsForTable(
     $progressPercent
   );
 
-  $url = 'https://api.anthropic.com/v1/messages';
-
   $prompt = buildPromptForTable($tableName, $tableDetail, $db1Label, $db2Label, $fullContext);
-
-  $payload = [
-    'model' => SQL_GENERATOR_MODEL,
-    'max_tokens' => 2048,
-    'system' => 'You are a helpful assistant that generates SQL statements for MySQL database schema migration based on provided context and instructions.',
-    'messages' => [
-      [
-        'role' => 'user',
-        'content' => $prompt,
-      ],
-    ],
-  ];
+  $systemInstruction = 'You are a helpful assistant that generates SQL statements for MySQL database schema migration based on provided context and instructions.';
 
   reportProgress(
     $storageConnection,
@@ -52,16 +42,92 @@ function generateSqlStatementsForTable(
     $progressPercent
   );
 
-  $ch = curl_init($url);
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-  curl_setopt($ch, CURLOPT_POST, true);
-  curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-  curl_setopt($ch, CURLOPT_HTTPHEADER, [
+  $result = ['success' => false, 'error' => 'Unknown provider'];
+
+  if ($provider === 'google') {
+    $targetModel = $model !== '' ? $model : DEFAULT_GOOGLE_MODEL;
+    $result = callGoogleGeminiApi($apiKey, $targetModel, $systemInstruction, $prompt);
+  } else {
+    // Default to Anthropic
+    $targetModel = $model !== '' ? $model : DEFAULT_ANTHROPIC_MODEL;
+    $result = callAnthropicApi($apiKey, $targetModel, $systemInstruction, $prompt);
+  }
+
+  if ($result['success']) {
+    reportProgress(
+      $storageConnection,
+      $runId,
+      'sql_generated',
+      "SQL generated for table {$tableName}",
+      $progressPercent
+    );
+    return extractSqlFromResponse($result['text']);
+  }
+
+  return '-- Error: ' . $result['error'];
+}
+
+function callAnthropicApi(string $apiKey, string $model, string $system, string $prompt): array
+{
+  $url = 'https://api.anthropic.com/v1/messages';
+
+  $payload = [
+    'model' => $model,
+    'max_tokens' => 2048,
+    'system' => $system,
+    'messages' => [
+      [
+        'role' => 'user',
+        'content' => $prompt,
+      ],
+    ],
+  ];
+
+  $headers = [
     'Content-Type: application/json',
     'x-api-key: ' . $apiKey,
     'anthropic-version: 2023-06-01',
     'anthropic-beta: context-1m-2025-08-07',
-  ]);
+  ];
+
+  return executeCurlRequest($url, $headers, $payload, function (array $data) {
+    if (isset($data['content'][0]['text'])) {
+      return ['success' => true, 'text' => $data['content'][0]['text']];
+    }
+    return ['success' => false, 'error' => 'Unexpected API response format'];
+  });
+}
+
+function callGoogleGeminiApi(string $apiKey, string $model, string $system, string $prompt): array
+{
+  $url = 'https://generativelanguage.googleapis.com/v1beta/interactions';
+
+  $payload = [
+    'model' => $model,
+    'system_instruction' => $system,
+    'input' => $prompt
+  ];
+
+  $headers = [
+    'Content-Type: application/json',
+    'x-goog-api-key: ' . $apiKey,
+  ];
+
+  return executeCurlRequest($url, $headers, $payload, function (array $data) {
+    if (isset($data['outputs'][0]['text'])) {
+      return ['success' => true, 'text' => $data['outputs'][0]['text']];
+    }
+    return ['success' => false, 'error' => 'Unexpected API response format'];
+  });
+}
+
+function executeCurlRequest(string $url, array $headers, array $payload, callable $parser): array
+{
+  $ch = curl_init($url);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_POST, true);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+  curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
   curl_setopt($ch, CURLOPT_TIMEOUT, 120);
   curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 
@@ -71,31 +137,20 @@ function generateSqlStatementsForTable(
   curl_close($ch);
 
   if ($response === false) {
-    return '-- Error: Unable to generate SQL (cURL error: ' . ($curlError ?: 'unknown') . ')';
+    return ['success' => false, 'error' => 'Unable to generate SQL (cURL error: ' . ($curlError ?: 'unknown') . ')'];
   }
 
   if ($httpCode !== 200) {
-    return "-- Error: Unable to generate SQL (HTTP $httpCode)\n-- Response: " . substr($response, 0, 200);
+    return ['success' => false, 'error' => "Unable to generate SQL (HTTP $httpCode)\n-- Response: " . substr($response, 0, 200)];
   }
 
   $data = json_decode($response, true);
 
   if (!is_array($data)) {
-    return '-- Error: Unable to parse API response';
+    return ['success' => false, 'error' => 'Unable to parse API response'];
   }
 
-  if (isset($data['content'][0]['text'])) {
-    reportProgress(
-      $storageConnection,
-      $runId,
-      'sql_generated',
-      "SQL generated for table {$tableName}",
-      $progressPercent
-    );
-    return extractSqlFromResponse($data['content'][0]['text']);
-  }
-
-  return '-- Error: Unexpected API response format';
+  return $parser($data);
 }
 
 function buildPromptForTable(
