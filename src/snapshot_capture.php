@@ -123,7 +123,7 @@ function insertTableSnapshot(
     ?string $metadataJson
 ): int {
     $stmt = $storageConnection->prepare(
-        'INSERT INTO table_snapshots (run_id, database_side, table_name, engine, collation, checksum, metadata_json)
+        'INSERT INTO dbdif_table_snapshots (run_id, database_side, table_name, engine, collation, checksum, metadata_json)
          VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
 
@@ -154,7 +154,7 @@ function storeColumnSnapshots(
     $result = $dbConnection->query('SHOW FULL COLUMNS FROM ' . $escapedTable);
 
     $stmt = $storageConnection->prepare(
-        'INSERT INTO column_snapshots (
+        'INSERT INTO dbdif_column_snapshots (
             table_snapshot_id,
             column_name,
             ordinal_position,
@@ -277,12 +277,12 @@ function storeForeignKeySnapshots(
     ksort($foreignKeys, SORT_NATURAL | SORT_FLAG_CASE);
 
     $fkStmt = $storageConnection->prepare(
-        'INSERT INTO foreign_key_snapshots (table_snapshot_id, constraint_name, update_rule, delete_rule)
+        'INSERT INTO dbdif_foreign_key_snapshots (table_snapshot_id, constraint_name, update_rule, delete_rule)
          VALUES (?, ?, ?, ?)'
     );
 
     $fkColumnStmt = $storageConnection->prepare(
-        'INSERT INTO foreign_key_columns (foreign_key_id, position, column_name, referenced_table, referenced_column)
+        'INSERT INTO dbdif_foreign_key_columns (foreign_key_id, position, column_name, referenced_table, referenced_column)
          VALUES (?, ?, ?, ?, ?)'
     );
 

@@ -92,7 +92,7 @@ function fetchTableSnapshot(
 ): ?array {
     $stmt = $storageConnection->prepare(
         'SELECT id, engine, collation
-         FROM table_snapshots
+         FROM dbdif_table_snapshots
          WHERE run_id = ? AND database_side = ? AND table_name = ?
          LIMIT 1'
     );
@@ -120,7 +120,7 @@ function fetchColumnsFromStorage(mysqli $storageConnection, int $tableSnapshotId
 {
     $stmt = $storageConnection->prepare(
         'SELECT column_name, column_type, is_nullable, column_key, column_default, extra, collation, comment
-         FROM column_snapshots
+         FROM dbdif_column_snapshots
          WHERE table_snapshot_id = ?
          ORDER BY ordinal_position'
     );
@@ -167,8 +167,8 @@ function fetchForeignKeysFromStorage(mysqli $storageConnection, int $tableSnapsh
                 fkc.column_name,
                 fkc.referenced_table,
                 fkc.referenced_column
-         FROM foreign_key_snapshots AS fks
-         LEFT JOIN foreign_key_columns AS fkc
+         FROM dbdif_foreign_key_snapshots AS fks
+         LEFT JOIN dbdif_foreign_key_columns AS fkc
            ON fkc.foreign_key_id = fks.id
          WHERE fks.table_snapshot_id = ?
          ORDER BY fks.constraint_name, fkc.position'

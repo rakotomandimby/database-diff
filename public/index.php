@@ -21,7 +21,7 @@ try {
         // Load existing comparison from storage
         $runInfo = null;
         $stmt = $storageConnection->prepare(
-            'SELECT source_label, target_label, status, error_message FROM comparison_runs WHERE id = ?'
+            'SELECT source_label, target_label, status, error_message FROM dbdif_comparison_runs WHERE id = ?'
         );
         $stmt->bind_param('i', $runId);
         $stmt->execute();
@@ -61,7 +61,7 @@ try {
 
             // Fetch all generated SQL statements at once for efficiency
             $sqlStatements = [];
-            $sqlResult = $storageConnection->query("SELECT table_name, statements FROM generated_sql WHERE run_id = $runId");
+            $sqlResult = $storageConnection->query("SELECT table_name, statements FROM dbdif_generated_sql WHERE run_id = $runId");
             while ($row = $sqlResult->fetch_assoc()) {
                 $sqlStatements[$row['table_name']] = $row['statements'];
             }
@@ -98,3 +98,4 @@ require __DIR__ . '/../templates/database_comparison.php';
 if ($storageConnection instanceof mysqli) {
     $storageConnection->close();
 }
+

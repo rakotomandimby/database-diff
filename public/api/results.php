@@ -83,7 +83,7 @@ try {
     // Get run metadata
     $stmt = $storageConnection->prepare(
         'SELECT source_label, target_label, source_database, target_database
-         FROM comparison_runs
+         FROM dbdif_comparison_runs
          WHERE id = ?
          LIMIT 1'
     );
@@ -135,7 +135,7 @@ try {
             // Retrieve generated SQL from storage
             $sqlStmt = $storageConnection->prepare(
                 'SELECT statements, model_name, generated_at
-                 FROM generated_sql
+                 FROM dbdif_generated_sql
                  WHERE run_id = ? AND table_name = ?
                  LIMIT 1'
             );

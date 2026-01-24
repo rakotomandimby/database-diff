@@ -71,7 +71,7 @@ function persistTableDifferences(
     }
 
     $stmt = $storageConnection->prepare(
-        'INSERT INTO table_differences (run_id, table_name, difference_type, database_side, payload)
+        'INSERT INTO dbdif_table_differences (run_id, table_name, difference_type, database_side, payload)
          VALUES (?, ?, ?, ?, ?)'
     );
 
@@ -101,7 +101,7 @@ function getTablesFromStorage(mysqli $storageConnection, int $runId, string $dat
 {
     $stmt = $storageConnection->prepare(
         'SELECT table_name
-         FROM table_snapshots
+         FROM dbdif_table_snapshots
          WHERE run_id = ? AND database_side = ?'
     );
 
@@ -126,7 +126,7 @@ function getAllTablesForRun(mysqli $storageConnection, int $runId): array
 {
     $stmt = $storageConnection->prepare(
         'SELECT DISTINCT table_name
-         FROM table_snapshots
+         FROM dbdif_table_snapshots
          WHERE run_id = ?'
     );
 
@@ -159,7 +159,7 @@ function getAllTablesForRun(mysqli $storageConnection, int $runId): array
 function cleanupOldComparisonRuns(mysqli $storageConnection, int $daysToKeep = 7): int
 {
     $stmt = $storageConnection->prepare(
-        'DELETE FROM comparison_runs
+        'DELETE FROM dbdif_comparison_runs
          WHERE completed_at < DATE_SUB(NOW(), INTERVAL ? DAY)
             OR (status = "failed" AND started_at < DATE_SUB(NOW(), INTERVAL ? DAY))'
     );
@@ -183,7 +183,7 @@ function cleanupOldComparisonRuns(mysqli $storageConnection, int $daysToKeep = 7
 function cleanupStalledComparisonRuns(mysqli $storageConnection, int $timeoutMinutes = 30): int
 {
     $stmt = $storageConnection->prepare(
-        'DELETE FROM comparison_runs
+        'DELETE FROM dbdif_comparison_runs
          WHERE status = "running"
            AND started_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)'
     );
@@ -222,7 +222,7 @@ function getStorageStatistics(mysqli $storageConnection): array
             SUM(CASE WHEN status = "running" THEN 1 ELSE 0 END) as running,
             MIN(started_at) as oldest,
             MAX(started_at) as newest
-         FROM comparison_runs'
+         FROM dbdif_comparison_runs'
     );
 
     if ($result !== false) {
@@ -239,3 +239,4 @@ function getStorageStatistics(mysqli $storageConnection): array
     }
     return $stats;
 }
+

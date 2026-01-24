@@ -27,7 +27,7 @@ function reportProgress(
 
     // Insert progress record
     $stmt = $storageConnection->prepare(
-        'INSERT INTO comparison_progress (run_id, step, message, progress_percent)
+        'INSERT INTO dbdif_comparison_progress (run_id, step, message, progress_percent)
          VALUES (?, ?, ?, ?)'
     );
 
@@ -37,7 +37,7 @@ function reportProgress(
 
     // Update the comparison run with current status
     $updateStmt = $storageConnection->prepare(
-        'UPDATE comparison_runs
+        'UPDATE dbdif_comparison_runs
          SET current_step = ?, progress_percent = ?
          WHERE id = ?'
     );
@@ -61,7 +61,7 @@ function getCurrentProgress(mysqli $storageConnection, int $runId): ?array
 {
     $stmt = $storageConnection->prepare(
         'SELECT status, current_step, progress_percent, error_message, started_at, completed_at
-         FROM comparison_runs
+         FROM dbdif_comparison_runs
          WHERE id = ?
          LIMIT 1'
     );
@@ -102,7 +102,7 @@ function getAllProgressSteps(mysqli $storageConnection, int $runId): array
 {
     $stmt = $storageConnection->prepare(
         'SELECT step, message, progress_percent, created_at
-         FROM comparison_progress
+         FROM dbdif_comparison_progress
          WHERE run_id = ?
          ORDER BY id ASC'
     );
@@ -141,7 +141,7 @@ function getLatestProgressMessage(mysqli $storageConnection, int $runId): ?strin
 {
     $stmt = $storageConnection->prepare(
         'SELECT message
-         FROM comparison_progress
+         FROM dbdif_comparison_progress
          WHERE run_id = ?
          ORDER BY id DESC
          LIMIT 1'
@@ -244,7 +244,7 @@ function formatDuration(int $seconds): string
 function deleteProgressRecords(mysqli $storageConnection, int $runId): int
 {
     $stmt = $storageConnection->prepare(
-        'DELETE FROM comparison_progress
+        'DELETE FROM dbdif_comparison_progress
          WHERE run_id = ?'
     );
 

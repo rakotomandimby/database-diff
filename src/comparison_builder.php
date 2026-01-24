@@ -89,7 +89,7 @@ function createComparisonRun(mysqli $storageConnection, array $db1Config, array 
     $targetDatabase = $db2Config['database'] ?? '';
 
     $stmt = $storageConnection->prepare(
-        'INSERT INTO comparison_runs (source_label, target_label, source_database, target_database)
+        'INSERT INTO dbdif_comparison_runs (source_label, target_label, source_database, target_database)
          VALUES (?, ?, ?, ?)'
     );
 
@@ -103,7 +103,7 @@ function createComparisonRun(mysqli $storageConnection, array $db1Config, array 
 function markComparisonRunCompleted(mysqli $storageConnection, int $runId): void
 {
     $stmt = $storageConnection->prepare(
-        'UPDATE comparison_runs
+        'UPDATE dbdif_comparison_runs
          SET status = "completed", completed_at = NOW(), progress_percent = 100
          WHERE id = ?'
     );
@@ -116,7 +116,7 @@ function markComparisonRunCompleted(mysqli $storageConnection, int $runId): void
 function markComparisonRunFailed(mysqli $storageConnection, int $runId, string $errorMessage): void
 {
     $stmt = $storageConnection->prepare(
-        'UPDATE comparison_runs
+        'UPDATE dbdif_comparison_runs
          SET status = "failed", completed_at = NOW(), error_message = ?
          WHERE id = ?'
     );
@@ -134,7 +134,7 @@ function storeGeneratedSql(
     string $statements
 ): void {
     $stmt = $storageConnection->prepare(
-        'INSERT INTO generated_sql (run_id, table_name, statements, model_name)
+        'INSERT INTO dbdif_generated_sql (run_id, table_name, statements, model_name)
          VALUES (?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
             statements = VALUES(statements),
