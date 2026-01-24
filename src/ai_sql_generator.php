@@ -96,12 +96,13 @@ function callAnthropicApi(string $apiKey, string $model, string $system, string 
   ];
 
   return executeCurlRequest($url, $headers, $payload, function (array $data, string $rawResponse) {
+    // Anthropic response format: { "content": [ { "text": "..." } ] }
     if (isset($data['content'][0]['text'])) {
       return ['success' => true, 'text' => $data['content'][0]['text']];
     }
     return [
       'success' => false,
-      'error' => 'Unexpected API response format',
+      'error' => 'Unexpected Anthropic API response format',
       'response' => $rawResponse,
     ];
   });
@@ -123,12 +124,13 @@ function callGoogleGeminiApi(string $apiKey, string $model, string $system, stri
   ];
 
   return executeCurlRequest($url, $headers, $payload, function (array $data, string $rawResponse) {
+    // Google Gemini Interactions response format: { "outputs": [ { "text": "..." } ] }
     if (isset($data['outputs'][0]['text'])) {
       return ['success' => true, 'text' => $data['outputs'][0]['text']];
     }
     return [
       'success' => false,
-      'error' => 'Unexpected API response format',
+      'error' => 'Unexpected Google API response format',
       'response' => $rawResponse,
     ];
   });
