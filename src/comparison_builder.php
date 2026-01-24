@@ -115,6 +115,11 @@ function markComparisonRunCompleted(mysqli $storageConnection, int $runId): void
 
 function markComparisonRunFailed(mysqli $storageConnection, int $runId, string $errorMessage): void
 {
+    // Ensure errorMessage isn't too long for the database field
+    if (strlen($errorMessage) > 60000) {
+        $errorMessage = substr($errorMessage, 0, 60000) . '... (truncated)';
+    }
+
     $stmt = $storageConnection->prepare(
         'UPDATE dbdif_comparison_runs
          SET status = "failed", completed_at = NOW(), error_message = ?

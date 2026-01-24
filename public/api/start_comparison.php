@@ -65,11 +65,13 @@ try {
     set_time_limit(0);
     
     // Reconnect to storage for background processing
-    $storageConnection = createConnection($storageDatabase);
+    $storageConnection = null;
     $db1Connection = null;
     $db2Connection = null;
     
     try {
+        $storageConnection = createConnection($storageDatabase);
+
         reportProgress(
             $storageConnection,
             $runId,
@@ -179,16 +181,47 @@ try {
         
     } catch (Throwable $exception) {
         $errorMessage = $exception->getMessage();
+        $file = $exception->getFile();
+        $line = $exception->getLine();
         
-        reportProgress(
-            $storageConnection,
-            $runId,
-            'error',
-            'Error: ' . $errorMessage,
-            0
-        );
+        $detailedError = "Error: {$errorMessage}\nLocation: {$file}:{$line}";
         
-        markComparisonRunFailed($storageConnection, $runId, $errorMessage);
+        // Ensure we have a storage connection to report the error
+        $connected = false;
+        if ($storageConnection instanceof mysqli) {
+            try {
+                if ($storageConnection->ping()) {
+                    $connected = true;
+                }
+            } catch (Throwable $e) {
+                // Ping failed
+            }
+        }
+        
+        if (!$connected) {
+            try {
+                $storageConnection = createConnection($storageDatabase);
+            } catch (Throwable $e) {
+                // If we can't connect to storage, we can't report the error to the DB.
+                // Log to system error log as a fallback.
+                error_log("Critical failure in background comparison (Run $runId): " . $detailedError);
+                exit;
+            }
+        }
+        
+        try {
+            reportProgress(
+                $storageConnection,
+                $runId,
+                'error',
+                'Error: ' . $errorMessage,
+                0
+            );
+            
+            markComparisonRunFailed($storageConnection, $runId, $detailedError);
+        } catch (Throwable $e) {
+            error_log("Failed to report error to DB (Run $runId): " . $e->getMessage());
+        }
     } finally {
         if ($db1Connection instanceof mysqli) {
             $db1Connection->close();

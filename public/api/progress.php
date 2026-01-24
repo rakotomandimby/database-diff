@@ -108,7 +108,7 @@ try {
         $response['steps'] = $steps;
     }
     
-    echo json_encode($response);
+    echo json_encode($response, JSON_INVALID_UTF8_SUBSTITUTE);
     
     $storageConnection->close();
     
