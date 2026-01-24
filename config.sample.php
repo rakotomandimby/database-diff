@@ -2,7 +2,7 @@
 
 // LLM Provider Configuration
 // Options: 'anthropic', 'google'
-$llmProvider = 'anthropic';
+$llmProvider = 'google';
 
 // API Key for the selected provider
 $llmApiKey = '';
