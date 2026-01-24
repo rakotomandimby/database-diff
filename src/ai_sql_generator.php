@@ -21,7 +21,7 @@ function generateSqlStatementsForTable(
 ): string {
   $baseProgress = 65;
   $progressRange = 30; // SQL generation covers 65-95%
-  
+
   $progressPercent = $baseProgress + (int) round(($currentTableIndex / $totalTables) * $progressRange);
   reportProgress(
     $storageConnection,
@@ -64,7 +64,12 @@ function generateSqlStatementsForTable(
     return extractSqlFromResponse($result['text']);
   }
 
-  return '-- Error: ' . $result['error'];
+  $errorMessage = $result['error'];
+  if (isset($result['response'])) {
+    $errorMessage .= "\n-- Response: " . $result['response'];
+  }
+
+  return '-- Error: ' . $errorMessage;
 }
 
 function callAnthropicApi(string $apiKey, string $model, string $system, string $prompt): array
@@ -90,11 +95,15 @@ function callAnthropicApi(string $apiKey, string $model, string $system, string 
     'anthropic-beta: context-1m-2025-08-07',
   ];
 
-  return executeCurlRequest($url, $headers, $payload, function (array $data) {
+  return executeCurlRequest($url, $headers, $payload, function (array $data, string $rawResponse) {
     if (isset($data['content'][0]['text'])) {
       return ['success' => true, 'text' => $data['content'][0]['text']];
     }
-    return ['success' => false, 'error' => 'Unexpected API response format'];
+    return [
+      'success' => false,
+      'error' => 'Unexpected API response format',
+      'response' => $rawResponse,
+    ];
   });
 }
 
@@ -113,11 +122,15 @@ function callGoogleGeminiApi(string $apiKey, string $model, string $system, stri
     'x-goog-api-key: ' . $apiKey,
   ];
 
-  return executeCurlRequest($url, $headers, $payload, function (array $data) {
+  return executeCurlRequest($url, $headers, $payload, function (array $data, string $rawResponse) {
     if (isset($data['outputs'][0]['text'])) {
       return ['success' => true, 'text' => $data['outputs'][0]['text']];
     }
-    return ['success' => false, 'error' => 'Unexpected API response format'];
+    return [
+      'success' => false,
+      'error' => 'Unexpected API response format',
+      'response' => $rawResponse,
+    ];
   });
 }
 
@@ -137,20 +150,32 @@ function executeCurlRequest(string $url, array $headers, array $payload, callabl
   curl_close($ch);
 
   if ($response === false) {
-    return ['success' => false, 'error' => 'Unable to generate SQL (cURL error: ' . ($curlError ?: 'unknown') . ')'];
+    return [
+      'success' => false,
+      'error' => 'Unable to generate SQL (cURL error: ' . ($curlError ?: 'unknown') . ')',
+    ];
   }
 
   if ($httpCode !== 200) {
-    return ['success' => false, 'error' => "Unable to generate SQL (HTTP $httpCode)\n-- Response: " . substr($response, 0, 200)];
+    return [
+      'success' => false,
+      'error' => "Unable to generate SQL (HTTP $httpCode)",
+      'response' => $response,
+    ];
   }
 
   $data = json_decode($response, true);
 
   if (!is_array($data)) {
-    return ['success' => false, 'error' => 'Unable to parse API response'];
+    $jsonError = function_exists('json_last_error_msg') ? json_last_error_msg() : 'unknown';
+    return [
+      'success' => false,
+      'error' => 'Unable to parse API response (JSON error: ' . $jsonError . ')',
+      'response' => $response,
+    ];
   }
 
-  return $parser($data);
+  return $parser($data, $response);
 }
 
 function buildPromptForTable(
