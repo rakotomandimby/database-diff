@@ -1,6 +1,6 @@
 # Database Comparison & SQL Migration Tool
 
-A PHP-based web application that compares two MySQL databases, identifies schema differences, and generates SQL migration statements using AI to synchronize them.
+A PHP-based web application that compares two MySQL databases, identifies schema differences, and **asks AI** to generate SQL migration statements to synchronize them.
 
 ![Database Diff Screenshot](./Screenshot_Database-diff.png)
 
