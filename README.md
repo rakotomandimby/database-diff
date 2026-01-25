@@ -2,9 +2,44 @@
 
 A PHP-based web application that compares two MySQL databases, identifies schema differences, and generates SQL migration statements using AI to synchronize them.
 
+![Database Diff Screenshot](./Screenshot_Database-diff.png)
+
+## Quick Start
+
+Get up and running in 5 minutes:
+
+1. **Clone and configure**
+   ```bash
+   git clone git@github.com:rakotomandimby/database-diff.git
+   cd database-diff
+   cp config.sample.php config.php
+   ```
+
+2. **Edit `config.php`** with your:
+   - Source database credentials
+   - Target database credentials
+   - Storage database credentials (for caching)
+   - Anthropic API key (or Google Gemini API key)
+
+3. **Set up the storage database**
+   ```bash
+   mysql -u root -p < database-structure.sql
+   ```
+
+4. **Run the application**
+   ```bash
+   php -S localhost:8000 -t public/
+   ```
+
+5. **Open in browser**: [http://localhost:8000](http://localhost:8000)
+
+The application will automatically compare your databases and generate SQL migration statements!
+
+---
+
 ## Description
 
-This tool automates the process of comparing database schemas between a source and target database. It analyzes tables, columns, indexes, foreign keys, and metadata, then leverages the Anthropic Claude AI model to generate precise SQL statements needed to make the target database match the source database structure.
+This tool automates the process of comparing database schemas between a source and target database. It analyzes tables, columns, indexes, foreign keys, and metadata, then leverages AI (Anthropic Claude or Google Gemini) to generate precise SQL statements needed to make the target database match the source database structure.
 
 The application stores all comparison data in a dedicated storage database for caching and historical reference, ensuring efficient re-runs and detailed audit trails.
 
@@ -76,8 +111,6 @@ The application stores all comparison data in a dedicated storage database for c
    - Displays results in an interactive UI
 
 ### Understanding the Output
-
-![./Screenshot_Database-diff.png](./Screenshot_Database-diff.png)
 
 The comparison results are displayed in sections:
 
