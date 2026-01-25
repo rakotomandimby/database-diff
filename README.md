@@ -19,6 +19,7 @@ Get up and running in 5 minutes:
    - Source database credentials
    - Target database credentials
    - Storage database credentials (for caching)
+     - **Database name**: Use `database_diff_storage` (created in step 3)
    - AI provider selection (Anthropic or Google)
    - API key for your chosen provider
 
@@ -26,6 +27,7 @@ Get up and running in 5 minutes:
    ```bash
    mysql -u root -p < database-structure.sql
    ```
+   This creates a database named `database_diff_storage` with all necessary tables.
 
 4. **Run the application**
    ```bash
@@ -79,7 +81,7 @@ The application stores all comparison data in a dedicated storage database for c
    ```bash
    mysql -u root -p < database-structure.sql
    ```
-   This creates all necessary tables in your storage database.
+   This creates a database named `database_diff_storage` with all necessary tables.
 
 3. **Configure the application**
    ```bash
@@ -172,7 +174,7 @@ $storageDatabase = [
   'host' => 'storage-db.example.com',
   'username' => 'storage_user',
   'password' => 'storage_password',
-  'database' => 'comparison_storage'
+  'database' => 'database_diff_storage'
 ];
 ```
 
@@ -243,15 +245,16 @@ $llmApiKey = getenv('ANTHROPIC_API_KEY'); // or getenv('GOOGLE_API_KEY')
 
 ## Storage Database Schema
 
-The storage database contains the following tables:
+The storage database (`database_diff_storage`) contains the following tables with the `dbdif_` prefix:
 
-- `comparison_runs`: Tracks each comparison execution
-- `table_snapshots`: Stores table metadata snapshots
-- `column_snapshots`: Stores column definition snapshots
-- `foreign_key_snapshots`: Stores foreign key definitions
-- `foreign_key_columns`: Stores foreign key column mappings
-- `table_differences`: Persists identified differences
-- `generated_sql`: Caches generated SQL statements
+- `dbdif_comparison_runs`: Tracks each comparison execution
+- `dbdif_table_snapshots`: Stores table metadata snapshots
+- `dbdif_column_snapshots`: Stores column definition snapshots
+- `dbdif_foreign_key_snapshots`: Stores foreign key definitions
+- `dbdif_foreign_key_columns`: Stores foreign key column mappings
+- `dbdif_table_differences`: Persists identified differences
+- `dbdif_generated_sql`: Caches generated SQL statements
+- `dbdif_comparison_progress`: Tracks progress of comparison runs
 
 See `database-structure.sql` for detailed schema.
 
