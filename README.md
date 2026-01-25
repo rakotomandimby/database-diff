@@ -19,7 +19,8 @@ Get up and running in 5 minutes:
    - Source database credentials
    - Target database credentials
    - Storage database credentials (for caching)
-   - Anthropic API key (or Google Gemini API key)
+   - AI provider selection (Anthropic or Google)
+   - API key for your chosen provider
 
 3. **Set up the storage database**
    ```bash
@@ -39,7 +40,7 @@ The application will automatically compare your databases and generate SQL migra
 
 ## Description
 
-This tool automates the process of comparing database schemas between a source and target database. It analyzes tables, columns, indexes, foreign keys, and metadata, then leverages AI (Anthropic Claude or Google Gemini) to generate precise SQL statements needed to make the target database match the source database structure.
+This tool automates the process of comparing database schemas between a source and target database. It analyzes tables, columns, indexes, foreign keys, and metadata, then leverages AI to generate precise SQL statements needed to make the target database match the source database structure. Supports both Anthropic Claude and Google Gemini AI models.
 
 The application stores all comparison data in a dedicated storage database for caching and historical reference, ensuring efficient re-runs and detailed audit trails.
 
@@ -51,11 +52,11 @@ The application stores all comparison data in a dedicated storage database for c
   - Column definitions (type, constraints, defaults)
   - Foreign key constraints
   - Indexes and primary keys
-- **AI-Powered SQL Generation**: Uses Claude Haiku model to generate accurate MySQL migration statements
+- **AI-Powered SQL Generation**: Uses AI models (Anthropic Claude or Google Gemini) to generate accurate MySQL migration statements
 - **Visual Diff Interface**: Clean, responsive web UI showing all differences with color-coded indicators
 - **Storage Database Caching**: Maintains snapshots for historical comparison and efficient processing
 - **Error Handling**: Robust error handling with detailed error messages
-- **Secure API Integration**: Secure communication with Anthropic's API using environment-based configuration
+- **Secure API Integration**: Secure communication with AI provider APIs using environment-based configuration
 
 ## Installation
 
@@ -64,7 +65,7 @@ The application stores all comparison data in a dedicated storage database for c
 - PHP 8.0 or higher
 - MySQL 5.7 or higher (for both source and target databases)
 - A separate MySQL database for storing comparison snapshots
-- Anthropic API key
+- API key for either Anthropic Claude or Google Gemini
 
 ### Steps
 
@@ -84,7 +85,7 @@ The application stores all comparison data in a dedicated storage database for c
    ```bash
    cp config.sample.php config.php
    ```
-   Edit `config.php` with your database credentials and API key.
+   Edit `config.php` with your database credentials, AI provider choice, and API key.
 
 4. **Set appropriate permissions**
    ```bash
@@ -135,8 +136,18 @@ The generated SQL statements are displayed in a code block under "SQL Migration 
 ```php
 <?php
 
-// Anthropic API key for SQL generation
+// LLM Provider Configuration
+// Options: 'anthropic', 'google'
+$llmProvider = 'anthropic';
+
+// API Key for the selected provider
 $llmApiKey = 'your-api-key-here';
+
+// Model Selection
+// Leave empty to use defaults:
+// - Anthropic: 'claude-haiku-4-5'
+// - Google: 'gemini-3-flash-preview'
+$llmModel = '';
 
 // Source database configuration
 $db1Config = [
@@ -168,13 +179,21 @@ $storageDatabase = [
 ### Environment Variables (Optional)
 
 You can set the API key via environment variable:
+
+**For Anthropic:**
 ```bash
 export ANTHROPIC_API_KEY="your-api-key-here"
 ```
 
+**For Google:**
+```bash
+export GOOGLE_API_KEY="your-api-key-here"
+```
+
 Then reference it in `config.php`:
 ```php
-$llmApiKey = getenv('ANTHROPIC_API_KEY');
+$llmProvider = 'anthropic'; // or 'google'
+$llmApiKey = getenv('ANTHROPIC_API_KEY'); // or getenv('GOOGLE_API_KEY')
 ```
 
 ## Project Structure
@@ -236,17 +255,25 @@ The storage database contains the following tables:
 
 See `database-structure.sql` for detailed schema.
 
-## API Integration
+## AI Provider Integration
 
-This tool uses the **Anthropic Claude API** to generate SQL statements.
+This tool supports multiple AI providers for SQL generation. Choose the provider that best fits your needs.
 
-### Supported Models
+### Supported Providers
 
-- `claude-haiku-4-5`: Fast, economical model (default)
+#### Anthropic Claude
+- **Default Model**: `claude-haiku-4-5` (Fast, economical)
+- **API Documentation**: https://docs.anthropic.com/
+- **Configuration**: Set `$llmProvider = 'anthropic'` in config.php
+
+#### Google Gemini
+- **Default Model**: `gemini-3-flash-preview` (Fast, efficient)
+- **API Documentation**: https://ai.google.dev/
+- **Configuration**: Set `$llmProvider = 'google'` in config.php
 
 ### API Rate Limits
 
-Be aware of your Anthropic API rate limits. The tool makes one API call per table with differences.
+Be aware of your chosen provider's API rate limits. The tool makes one API call per table with differences.
 
 ### Error Handling
 
@@ -285,9 +312,11 @@ Contributions are welcome! Please follow these guidelines:
 - Ensure MySQL user has appropriate privileges
 
 ### API Errors
-- Verify Anthropic API key is valid and has available quota
-- Check API rate limits
-- Ensure network connectivity to api.anthropic.com
+- Verify your AI provider API key is valid and has available quota
+- Check API rate limits for your chosen provider
+- Ensure network connectivity to the provider's API endpoint:
+  - Anthropic: api.anthropic.com
+  - Google: generativelanguage.googleapis.com
 
 ### SQL Generation Issues
 - Review error messages in the UI
