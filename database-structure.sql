@@ -1,4 +1,7 @@
-CREATE TABLE `mrktmbcdatabase`.`comparison_runs` (
+CREATE DATABASE IF NOT EXISTS `database_diff_storage`;
+USE `database_diff_storage`;
+
+CREATE TABLE `dbdif_comparison_runs` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `source_label` VARCHAR(255) NOT NULL,
   `target_label` VARCHAR(255) NOT NULL,
@@ -8,11 +11,13 @@ CREATE TABLE `mrktmbcdatabase`.`comparison_runs` (
   `completed_at` DATETIME NULL,
   `status` ENUM('running','completed','failed') NOT NULL DEFAULT 'running',
   `error_message` TEXT NULL,
+  `current_step` VARCHAR(255) NULL,
+  `progress_percent` INT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   INDEX (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `mrktmbcdatabase`.`table_snapshots` (
+CREATE TABLE `dbdif_table_snapshots` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `run_id` BIGINT UNSIGNED NOT NULL,
   `database_side` ENUM('source','target') NOT NULL,
@@ -25,10 +30,10 @@ CREATE TABLE `mrktmbcdatabase`.`table_snapshots` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_run_side_table` (`run_id`,`database_side`,`table_name`),
   CONSTRAINT `fk_table_snapshot_run`
-    FOREIGN KEY (`run_id`) REFERENCES `comparison_runs`(`id`) ON DELETE CASCADE
+    FOREIGN KEY (`run_id`) REFERENCES `dbdif_comparison_runs`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `mrktmbcdatabase`.`column_snapshots` (
+CREATE TABLE `dbdif_column_snapshots` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `table_snapshot_id` BIGINT UNSIGNED NOT NULL,
   `column_name` VARCHAR(255) NOT NULL,
@@ -44,10 +49,10 @@ CREATE TABLE `mrktmbcdatabase`.`column_snapshots` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_table_column` (`table_snapshot_id`,`column_name`),
   CONSTRAINT `fk_column_snapshot_table`
-    FOREIGN KEY (`table_snapshot_id`) REFERENCES `table_snapshots`(`id`) ON DELETE CASCADE
+    FOREIGN KEY (`table_snapshot_id`) REFERENCES `dbdif_table_snapshots`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `mrktmbcdatabase`.`foreign_key_snapshots` (
+CREATE TABLE `dbdif_foreign_key_snapshots` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `table_snapshot_id` BIGINT UNSIGNED NOT NULL,
   `constraint_name` VARCHAR(255) NOT NULL,
@@ -56,10 +61,10 @@ CREATE TABLE `mrktmbcdatabase`.`foreign_key_snapshots` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_table_constraint` (`table_snapshot_id`,`constraint_name`),
   CONSTRAINT `fk_fk_snapshot_table`
-    FOREIGN KEY (`table_snapshot_id`) REFERENCES `table_snapshots`(`id`) ON DELETE CASCADE
+    FOREIGN KEY (`table_snapshot_id`) REFERENCES `dbdif_table_snapshots`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `mrktmbcdatabase`.`foreign_key_columns` (
+CREATE TABLE `dbdif_foreign_key_columns` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `foreign_key_id` BIGINT UNSIGNED NOT NULL,
   `position` INT NOT NULL,
@@ -69,10 +74,10 @@ CREATE TABLE `mrktmbcdatabase`.`foreign_key_columns` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_fk_position` (`foreign_key_id`,`position`),
   CONSTRAINT `fk_fk_columns_fk`
-    FOREIGN KEY (`foreign_key_id`) REFERENCES `foreign_key_snapshots`(`id`) ON DELETE CASCADE
+    FOREIGN KEY (`foreign_key_id`) REFERENCES `dbdif_foreign_key_snapshots`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `mrktmbcdatabase`.`table_differences` (
+CREATE TABLE `dbdif_table_differences` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `run_id` BIGINT UNSIGNED NOT NULL,
   `table_name` VARCHAR(255) NOT NULL,
@@ -89,10 +94,10 @@ CREATE TABLE `mrktmbcdatabase`.`table_differences` (
   PRIMARY KEY (`id`),
   INDEX `idx_run_table` (`run_id`,`table_name`),
   CONSTRAINT `fk_table_diff_run`
-    FOREIGN KEY (`run_id`) REFERENCES `comparison_runs`(`id`) ON DELETE CASCADE
+    FOREIGN KEY (`run_id`) REFERENCES `dbdif_comparison_runs`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `mrktmbcdatabase`.`generated_sql` (
+CREATE TABLE `dbdif_generated_sql` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `run_id` BIGINT UNSIGNED NOT NULL,
   `table_name` VARCHAR(255) NOT NULL,
@@ -102,5 +107,18 @@ CREATE TABLE `mrktmbcdatabase`.`generated_sql` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_run_table_sql` (`run_id`,`table_name`),
   CONSTRAINT `fk_generated_sql_run`
-    FOREIGN KEY (`run_id`) REFERENCES `comparison_runs`(`id`) ON DELETE CASCADE
+    FOREIGN KEY (`run_id`) REFERENCES `dbdif_comparison_runs`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `dbdif_comparison_progress` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `run_id` BIGINT UNSIGNED NOT NULL,
+  `step` VARCHAR(255) NOT NULL,
+  `message` TEXT NOT NULL,
+  `progress_percent` INT NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  INDEX `idx_run_id` (`run_id`),
+  CONSTRAINT `fk_comparison_progress_run`
+    FOREIGN KEY (`run_id`) REFERENCES `dbdif_comparison_runs`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

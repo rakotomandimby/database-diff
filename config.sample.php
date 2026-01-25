@@ -31,6 +31,6 @@ $storageDatabase = [
   'host' => '',
   'username' => '',
   'password' => '',
-  'database' => ''
+  'database' => 'database_diff_storage'
 ];
 
