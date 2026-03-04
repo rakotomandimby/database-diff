@@ -23,11 +23,20 @@ function generateSqlStatementsForTable(
   $progressRange = 30; // SQL generation covers 65-95%
 
   $progressPercent = $baseProgress + (int) round(($currentTableIndex / $totalTables) * $progressRange);
+
+  if ($provider === 'google') {
+    $targetModel = $model !== '' ? $model : DEFAULT_GOOGLE_MODEL;
+    $providerLabel = 'Google Gemini';
+  } else {
+    $targetModel = $model !== '' ? $model : DEFAULT_ANTHROPIC_MODEL;
+    $providerLabel = 'Anthropic';
+  }
+
   reportProgress(
     $storageConnection,
     $runId,
     'generate_sql',
-    "Generating SQL for table {$tableName} ({$currentTableIndex}/{$totalTables})...",
+    "Generating SQL migration for table \"{$tableName}\" ({$currentTableIndex}/{$totalTables})...",
     $progressPercent
   );
 
@@ -38,18 +47,16 @@ function generateSqlStatementsForTable(
     $storageConnection,
     $runId,
     'ai_request',
-    "Waiting for AI response for table {$tableName}...",
+    "Querying {$providerLabel} API ({$targetModel}) for table \"{$tableName}\" ({$currentTableIndex}/{$totalTables})...",
     $progressPercent
   );
 
   $result = ['success' => false, 'error' => 'Unknown provider'];
 
   if ($provider === 'google') {
-    $targetModel = $model !== '' ? $model : DEFAULT_GOOGLE_MODEL;
     $result = callGoogleGeminiApi($apiKey, $targetModel, $systemInstruction, $prompt);
   } else {
     // Default to Anthropic
-    $targetModel = $model !== '' ? $model : DEFAULT_ANTHROPIC_MODEL;
     $result = callAnthropicApi($apiKey, $targetModel, $systemInstruction, $prompt);
   }
 
@@ -58,7 +65,7 @@ function generateSqlStatementsForTable(
       $storageConnection,
       $runId,
       'sql_generated',
-      "SQL generated for table {$tableName}",
+      "SQL migration generated for table \"{$tableName}\" via {$providerLabel} ({$currentTableIndex}/{$totalTables}).",
       $progressPercent
     );
     return extractSqlFromResponse($result['text']);
@@ -304,7 +311,7 @@ function buildFullDatabaseContext(array $comparison, mysqli $storageConnection, 
     $storageConnection,
     $runId,
     'build_context',
-    'Building context for AI model...',
+    'Building full database context for the AI model...',
     65
   );
 

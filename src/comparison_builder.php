@@ -15,25 +15,39 @@ function buildTableComparison(
 
     reportProgress($storageConnection, $runId, 'init', 'Initializing comparison...', 0);
 
-    reportProgress($storageConnection, $runId, 'snapshot_source', "Loading {$db1Label} schema...", 5);
+    reportProgress(
+        $storageConnection,
+        $runId,
+        'snapshot_source',
+        "Connecting to source database \"{$db1Label}\"...",
+        4
+    );
     captureDatabaseSnapshot(
         $db1Connection,
         $storageConnection,
         $runId,
         'source',
-        $db1Config['database'] ?? ''
+        $db1Config['database'] ?? '',
+        $db1Label
     );
 
-    reportProgress($storageConnection, $runId, 'snapshot_target', "Loading {$db2Label} schema...", 30);
+    reportProgress(
+        $storageConnection,
+        $runId,
+        'snapshot_target',
+        "Connecting to target database \"{$db2Label}\"...",
+        29
+    );
     captureDatabaseSnapshot(
         $db2Connection,
         $storageConnection,
         $runId,
         'target',
-        $db2Config['database'] ?? ''
+        $db2Config['database'] ?? '',
+        $db2Label
     );
 
-    reportProgress($storageConnection, $runId, 'load_tables', 'Loading table lists...', 50);
+    reportProgress($storageConnection, $runId, 'load_tables', 'Loading table lists from both databases...', 50);
     $tablesDb1 = getTablesFromStorage($storageConnection, $runId, 'source');
     $tablesDb2 = getTablesFromStorage($storageConnection, $runId, 'target');
 
@@ -43,7 +57,7 @@ function buildTableComparison(
     $allTables = array_values(array_unique(array_merge($tablesDb1, $tablesDb2)));
     sort($allTables, SORT_NATURAL | SORT_FLAG_CASE);
 
-    reportProgress($storageConnection, $runId, 'compare_schemas', 'Comparing schemas...', 55);
+    reportProgress($storageConnection, $runId, 'compare_schemas', 'Comparing schemas between both databases...', 55);
     $tableDetails = [];
     $totalTables = count($allTables);
     $processedTables = 0;
@@ -55,7 +69,7 @@ function buildTableComparison(
             $storageConnection,
             $runId,
             'analyze_table',
-            "Analyzing table {$tableName} ({$processedTables}/{$totalTables})...",
+            "Analysing differences for table \"{$tableName}\" ({$processedTables}/{$totalTables})...",
             $progressPercent
         );
 

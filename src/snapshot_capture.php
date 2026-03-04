@@ -7,31 +7,57 @@ function captureDatabaseSnapshot(
     mysqli $storageConnection,
     int $runId,
     string $databaseSide,
-    string $databaseName
+    string $databaseName,
+    string $databaseLabel = ''
 ): void {
+    $sideLabel = $databaseSide === 'source' ? 'source' : 'target';
+    $displayLabel = $databaseLabel !== '' ? $databaseLabel : $databaseName;
+
+    // Determine base progress percentage based on database side
+    $baseProgress = $databaseSide === 'source' ? 5 : 30;
+    $progressRange = 25; // Each snapshot phase covers 25% of total progress
+
+    reportProgress(
+        $storageConnection,
+        $runId,
+        "snapshot_{$sideLabel}_tables",
+        "Fetching table list from \"{$displayLabel}\"...",
+        $baseProgress
+    );
+
     $tables = getTables($dbConnection);
 
     if ($tables === []) {
+        reportProgress(
+            $storageConnection,
+            $runId,
+            "snapshot_{$sideLabel}_empty",
+            "No tables found in \"{$displayLabel}\".",
+            $baseProgress + $progressRange
+        );
         return;
     }
 
     $totalTables = count($tables);
     $processedTables = 0;
 
-    // Determine base progress percentage based on database side
-    $baseProgress = $databaseSide === 'source' ? 5 : 30;
-    $progressRange = 25; // Each snapshot phase covers 25% of total progress
+    reportProgress(
+        $storageConnection,
+        $runId,
+        "snapshot_{$sideLabel}_start",
+        "Found {$totalTables} table(s) in \"{$displayLabel}\". Starting snapshot...",
+        $baseProgress + 1
+    );
 
     foreach ($tables as $tableName) {
         $processedTables++;
         $progressPercent = $baseProgress + (int) round(($processedTables / $totalTables) * $progressRange);
-        
-        $sideLabel = $databaseSide === 'source' ? 'source' : 'target';
+
         reportProgress(
             $storageConnection,
             $runId,
             "snapshot_{$sideLabel}_table",
-            "Loading {$sideLabel} table {$tableName} ({$processedTables}/{$totalTables})...",
+            "Reading schema for table \"{$tableName}\" from \"{$displayLabel}\" ({$processedTables}/{$totalTables})...",
             $progressPercent
         );
 
@@ -65,12 +91,11 @@ function captureDatabaseSnapshot(
 
     // Report completion of this snapshot phase
     $finalProgress = $baseProgress + $progressRange;
-    $sideLabel = $databaseSide === 'source' ? 'source' : 'target';
     reportProgress(
         $storageConnection,
         $runId,
         "snapshot_{$sideLabel}_complete",
-        ucfirst($sideLabel) . " database snapshot complete",
+        "Snapshot of \"{$displayLabel}\" complete ({$totalTables} table(s) captured).",
         $finalProgress
     );
 }

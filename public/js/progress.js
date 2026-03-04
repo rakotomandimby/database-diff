@@ -3,8 +3,7 @@
  */
 document.addEventListener('DOMContentLoaded', () => {
   const progressContainer = document.getElementById('progress-container');
-  const resultsContainer = document.getElementById('results-container');
-  
+
   if (!progressContainer) return;
 
   const progressBar = document.getElementById('progress-bar-fill');
@@ -16,32 +15,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentRunId = null;
   let pollInterval = null;
+  let lastSeenStepCount = 0;
 
   /**
-   * Appends a message to the progress log
+   * Appends a message to the progress log (newest at top)
    */
-  const addLogEntry = (message) => {
+  const addLogEntry = (message, time) => {
     const entry = document.createElement('div');
     entry.className = 'progress-log-item';
-    const time = new Date().toLocaleTimeString();
-    entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+    const timeStr = time
+      ? new Date(time).toLocaleTimeString()
+      : new Date().toLocaleTimeString();
+    entry.innerHTML = `<span class="log-time">[${timeStr}]</span> ${message}`;
     progressLog.prepend(entry);
   };
 
   /**
-   * Updates the progress UI
+   * Updates the progress UI from an API response object
    */
   const updateUI = (data) => {
-    const percent = data.progress_percent || 0;
+    const percent = data.progressPercent || 0;
     progressBar.style.width = `${percent}%`;
     progressPercent.textContent = `${percent}%`;
-    
-    if (data.message) {
-      progressStatus.textContent = data.message;
-      // Only log if message changed
-      if (progressLog.firstChild?.textContent.indexOf(data.message) === -1) {
-        addLogEntry(data.message);
+
+    if (data.latestMessage) {
+      progressStatus.textContent = data.latestMessage;
+    }
+
+    // Render any new steps that arrived since last poll
+    if (Array.isArray(data.steps) && data.steps.length > lastSeenStepCount) {
+      const newSteps = data.steps.slice(lastSeenStepCount);
+      // Steps are in ascending order; we prepend so newest ends up on top
+      // We reverse so that after prepending the order remains chronological top-to-bottom
+      for (let i = newSteps.length - 1; i >= 0; i--) {
+        addLogEntry(newSteps[i].message, newSteps[i].created_at);
       }
+      lastSeenStepCount = data.steps.length;
     }
 
     if (data.status === 'completed') {
@@ -54,19 +63,22 @@ document.addEventListener('DOMContentLoaded', () => {
       clearInterval(pollInterval);
       progressContainer.classList.add('hidden');
       errorAlert.classList.remove('hidden');
-      errorMessage.textContent = data.error_message || 'An unknown error occurred during comparison.';
+      errorMessage.textContent =
+        data.errorMessage || 'An unknown error occurred during comparison.';
     }
   };
 
   /**
-   * Polls the progress API
+   * Polls the progress API, requesting all steps each time
    */
   const pollProgress = (runId) => {
     pollInterval = setInterval(async () => {
       try {
-        const response = await fetch(`api/progress.php?runId=${runId}`);
+        const response = await fetch(
+          `api/progress.php?runId=${runId}&includeSteps=true`
+        );
         if (!response.ok) throw new Error('Failed to fetch progress');
-        
+
         const data = await response.json();
         updateUI(data);
       } catch (error) {
@@ -82,11 +94,11 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       addLogEntry('Initiating comparison request...');
       const response = await fetch('api/start_comparison.php', {
-        method: 'POST'
+        method: 'POST',
       });
-      
+
       if (!response.ok) throw new Error('Failed to start comparison');
-      
+
       const data = await response.json();
       currentRunId = data.runId;
       addLogEntry(`Run ID ${currentRunId} created. Starting analysis...`);
